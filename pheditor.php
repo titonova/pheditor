@@ -26,7 +26,21 @@ define('TERMINAL_COMMANDS', 'ls,ll,cp,rm,mv,whoami,pidof,pwd,whereis,kill,php,da
 define('EDITOR_THEME', ''); // e.g. monokai
 define('DEFAULT_DIR_PERMISSION', 0755);
 define('DEFAULT_FILE_PERMISSION', 0644);
+define('PATH_TO_DEVS_JSON','../devs.json');
 define('LOCAL_ASSETS', false); // if true you should run `npm i` to download required libraries
+
+
+
+//define('USERS',json_decode(PATH_TO_DEVS_JSON));
+
+
+try { 
+  
+  define('USERS',json_decode(file_get_contents(PATH_TO_DEVS_JSON),true));  
+}  
+catch (\Exception $exception) {  
+  echo $exception->getMessage(); 
+}
 
 $assets = [
 	'cdn' => [
@@ -140,18 +154,29 @@ session_set_cookie_params(86400, dirname($_SERVER['REQUEST_URI']));
 session_name('pheditor');
 session_start();
 
-if (empty(PASSWORD) === false && (isset($_SESSION['pheditor_admin'], $_SESSION['pheditor_password']) === false || $_SESSION['pheditor_admin'] !== true || $_SESSION['pheditor_password'] != PASSWORD)) {
-	if (isset($_POST['pheditor_password']) && empty($_POST['pheditor_password']) === false) {
-		$password_hash = hash('sha512', $_POST['pheditor_password']);
 
-		if ($password_hash === PASSWORD) {
+if ((isset($_SESSION['pheditor_admin'], $_SESSION['pheditor_password']) === false || $_SESSION['pheditor_admin'] !== true || $_SESSION['pheditor_password'] != USERS[$_SESSION['username']]['password_hash'])) {
+	if (isset($_POST['pheditor_password']) && empty($_POST['pheditor_password']) === false) {
+       $username   = $_POST['username']   ?? null;
+        $_SESSION['username'] =  $username;
+        
+        //var_dump($username);exit();
+		$password_hash = hash('sha512', $_POST['pheditor_password']);
+        
+		if ($password_hash === USERS[$username]['password_hash']) {
 			session_regenerate_id(true);
 
 			$_SESSION['pheditor_admin'] = true;
 			$_SESSION['pheditor_password'] = $password_hash;
-
+            $_SESSION['SHOW_PHP_SELF'] = USERS[$username]['SHOW_PHP_SELF'];
+             $_SESSION['SHOW_HIDDEN_FILES'] = USERS[$username]['SHOW_HIDDEN_FILES'];
+                           
 			redirect();
 		} else {
+		    if(!isset(USERS[$username])){
+		        $error = 'No such user '.$username;
+		    }
+		    
 			$error = 'The entry password is not correct.';
 
 			$log = file_exists(LOG_FILE) ? unserialize(file_get_contents(LOG_FILE)) : array();
@@ -171,7 +196,7 @@ if (empty(PASSWORD) === false && (isset($_SESSION['pheditor_admin'], $_SESSION['
 		die('Your session has expired.');
 	}
 
-	die('<title>Pheditor</title><form method="post"><div style="text-align:center"><h1><a href="http://github.com/hamidsamak/pheditor" target="_blank" title="PHP file editor" style="color:#444;text-decoration:none" tabindex="3">Pheditor</a></h1>' . (isset($error) ? '<p style="color:#dd0000">' . $error . '</p>' : null) . '<input id="pheditor_password" name="pheditor_password" type="password" value="" placeholder="Password&hellip;" tabindex="1"><br><br><input type="submit" value="Login" tabindex="2"></div></form><script type="text/javascript">document.getElementById("pheditor_password").focus();</script>');
+	die('<title>Pheditor</title><form method="post"><div style="text-align:center"><h1><a href="http://github.com/hamidsamak/pheditor" target="_blank" title="PHP file editor" style="color:#444;text-decoration:none" tabindex="3">fladov code editor</a></h1>' . (isset($error) ? '<p style="color:#dd0000">' . $error . '</p>' : null) . '<input name="username"placeholder="Username"><br><input id="pheditor_password" name="pheditor_password" type="password" value="" placeholder="Password&hellip;" tabindex="1"><br><br><input type="submit" value="Login" tabindex="2"></div></form><script type="text/javascript">document.getElementById("pheditor_password").focus();</script>');
 }
 
 if (isset($_GET['logout'])) {

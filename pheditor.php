@@ -8,25 +8,42 @@
  * Release under MIT license
  */
 
+
+error_reporting(E_ALL);
+ini_set('display_errors',1);
 define('PASSWORD', 'c7ad44cbad762a5da0a452f9e854fdc1e0e7a52a38015f23f3eab1d80b931dd472634dfac71cd34ebc35d16ab7fb8a90c81f975113d6c7538dc69dd8de9077ec');
 define('DS', DIRECTORY_SEPARATOR);
-define('MAIN_DIR', __DIR__);
-define('VERSION', '2.0.0');
-define('LOG_FILE', MAIN_DIR . DS . '.phedlog');
-define('SHOW_PHP_SELF', false);
-define('SHOW_HIDDEN_FILES', false);
+define('MAIN_DIR_CONST', __DIR__);
+define('VERSION', '2.0.0'); 
+define('LOG_FILE', MAIN_DIR_CONST . DS . '.phedlog');
 define('ACCESS_IP', '');
-define('HISTORY_PATH', MAIN_DIR . DS . '.phedhistory');
+define('HISTORY_PATH', MAIN_DIR_CONST . DS . '.phedhistory');
 define('MAX_HISTORY_FILES', 5);
 define('WORD_WRAP', true);
 define('PERMISSIONS', 'newfile,newdir,editfile,deletefile,deletedir,renamefile,renamedir,changepassword,uploadfile,terminal'); // empty means all
-define('PATTERN_FILES', '/^[A-Za-z0-9-_.\/]*\.(txt|php|htm|html|js|css|tpl|md|xml|json)$/i'); // empty means no pattern
+
 define('PATTERN_DIRECTORIES', '/^((?!backup).)*$/i'); // empty means no pattern
 define('TERMINAL_COMMANDS', 'ls,ll,cp,rm,mv,whoami,pidof,pwd,whereis,kill,php,date,cd,mkdir,chmod,chown,rmdir,touch,cat,git,find,grep,echo,tar,zip,unzip,whatis,df,help,locate,pkill,du,updatedb,composer');
-define('EDITOR_THEME', ''); // e.g. monokai
+define('EDITOR_THEME', 'twilight'); // e.g. monokai
 define('DEFAULT_DIR_PERMISSION', 0755);
 define('DEFAULT_FILE_PERMISSION', 0644);
+define('PATH_TO_DEVS_JSON','../devs.json');
 define('LOCAL_ASSETS', false); // if true you should run `npm i` to download required libraries
+define('MAIN_DIR', dirname(__DIR__));
+
+//define('USERS',json_decode(PATH_TO_DEVS_JSON));
+
+
+try { 
+  
+  define('USERS',json_decode(file_get_contents(PATH_TO_DEVS_JSON),true));
+//  var_dump($_SESSION);exit();
+//
+  
+}  
+catch (\Exception $exception) {  
+  echo $exception->getMessage(); 
+}
 
 $assets = [
 	'cdn' => [
@@ -40,6 +57,7 @@ $assets = [
 			empty(EDITOR_THEME) ? '' : 'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.43.0/theme/' . EDITOR_THEME . '.css',
 			'https://cdnjs.cloudflare.com/ajax/libs/izitoast/1.4.0/css/iziToast.min.css',
 			'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.1/css/all.min.css',
+			'https://codemirror.net/addon/hint/show-hint.css'
 		],
 		'js' => [
 			'https://cdnjs.cloudflare.com/ajax/libs/jquery/3.3.1/jquery.js',
@@ -63,6 +81,9 @@ $assets = [
 			'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.43.0/addon/search/search.min.js',
 			'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.43.0/addon/search/searchcursor.min.js',
 			'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.43.0/addon/search/jump-to-line.min.js',
+			'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.43.0/addon/hint/show-hint.js',
+			'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.43.0/addon/hint/xml-hint.js',
+		    'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.43.0/addon/hint/html-hint.js',
 			'https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.43.0/addon/dialog/dialog.min.js',
 			'https://cdnjs.cloudflare.com/ajax/libs/izitoast/1.4.0/js/iziToast.min.js',
 			'https://cdnjs.cloudflare.com/ajax/libs/js-sha512/0.8.0/sha512.min.js'
@@ -140,18 +161,32 @@ session_set_cookie_params(86400, dirname($_SERVER['REQUEST_URI']));
 session_name('pheditor');
 session_start();
 
-if (empty(PASSWORD) === false && (isset($_SESSION['pheditor_admin'], $_SESSION['pheditor_password']) === false || $_SESSION['pheditor_admin'] !== true || $_SESSION['pheditor_password'] != PASSWORD)) {
-	if (isset($_POST['pheditor_password']) && empty($_POST['pheditor_password']) === false) {
-		$password_hash = hash('sha512', $_POST['pheditor_password']);
 
-		if ($password_hash === PASSWORD) {
+if ((isset($_SESSION['pheditor_admin'], $_SESSION['pheditor_password']) === false || $_SESSION['pheditor_admin'] !== true || $_SESSION['pheditor_password'] != USERS[$_SESSION['username']]['password_hash'])) {
+	if (isset($_POST['pheditor_password']) && empty($_POST['pheditor_password']) === false) {
+       $username   = $_POST['username']   ?? null;
+        $_SESSION['username'] =  $username;
+        
+        //var_dump($username);exit();
+		$password_hash = hash('sha512', $_POST['pheditor_password']);
+        
+		if ($password_hash === USERS[$username]['password_hash']) {
 			session_regenerate_id(true);
 
 			$_SESSION['pheditor_admin'] = true;
 			$_SESSION['pheditor_password'] = $password_hash;
-
+   
+            
+            foreach(USERS[$username] as $prop_key => $prop_val){
+                
+                $_SESSION[$prop_key] = $prop_val;
+            }
 			redirect();
 		} else {
+		    if(!isset(USERS[$username])){
+		        $error = 'No such user '.$username;
+		    }
+		    
 			$error = 'The entry password is not correct.';
 
 			$log = file_exists(LOG_FILE) ? unserialize(file_get_contents(LOG_FILE)) : array();
@@ -171,7 +206,7 @@ if (empty(PASSWORD) === false && (isset($_SESSION['pheditor_admin'], $_SESSION['
 		die('Your session has expired.');
 	}
 
-	die('<title>Pheditor</title><form method="post"><div style="text-align:center"><h1><a href="http://github.com/hamidsamak/pheditor" target="_blank" title="PHP file editor" style="color:#444;text-decoration:none" tabindex="3">Pheditor</a></h1>' . (isset($error) ? '<p style="color:#dd0000">' . $error . '</p>' : null) . '<input id="pheditor_password" name="pheditor_password" type="password" value="" placeholder="Password&hellip;" tabindex="1"><br><br><input type="submit" value="Login" tabindex="2"></div></form><script type="text/javascript">document.getElementById("pheditor_password").focus();</script>');
+	die('<title>Pheditor</title><form method="post"><div style="text-align:center"><h1><a href="http://github.com/hamidsamak/pheditor" target="_blank" title="PHP file editor" style="color:#444;text-decoration:none" tabindex="3">fladov code editor</a></h1>' . (isset($error) ? '<p style="color:#dd0000">' . $error . '</p>' : null) . '<input name="username"placeholder="Username"><br><input id="pheditor_password" name="pheditor_password" type="password" value="" placeholder="Password&hellip;" tabindex="1"><br><br><input type="submit" value="Login" tabindex="2"></div></form><script type="text/javascript">document.getElementById("pheditor_password").focus();</script>');
 }
 
 if (isset($_GET['logout'])) {
@@ -205,10 +240,14 @@ if (isset($_GET['path'])) {
 	asort($files);
 
 	foreach ($files as $key => $file) {
-		if (substr($file, 0, 1) === '.' || (SHOW_PHP_SELF === false && $dir . DS . $file == __FILE__)) {
+		if (substr($file, 0, 1) === '.' || ($_SESSION['SHOW_PHP_SELF'] === false && $dir . DS . $file == __FILE__)) {
 			continue;
 		}
 
+    if(in_array($file,$_SESSION['restricted_files']) ){
+        
+        continue;
+    }
 		if (is_dir($dir . DS . $file) && (empty(PATTERN_DIRECTORIES) || preg_match(PATTERN_DIRECTORIES, $file))) {
 			$dir_path = str_replace(MAIN_DIR, '', $dir . DS . $file . DS);
 
@@ -224,7 +263,7 @@ if (isset($_GET['path'])) {
 					'selected' => false,
 				],
 			];
-		} else if (empty(PATTERN_FILES) || preg_match(PATTERN_FILES, $file)) {
+		} else if (empty($_SESSION['PATTERN_FILES']) || preg_match($_SESSION['PATTERN_FILES'], $file)) {
 			$file_path = str_replace(MAIN_DIR, '', $dir . DS . $file);
 
 			$list[] = [
@@ -270,7 +309,7 @@ if (isset($_GET['path'])) {
 	if (isset($_POST['file']) && empty($_POST['file']) === false) {
 		$_POST['file'] = urldecode($_POST['file']);
 
-		if (empty(PATTERN_FILES) === false && !preg_match(PATTERN_FILES, basename($_POST['file']))) {
+		if (empty($_SESSION['PATTERN_FILES']) === false && !preg_match($_SESSION['PATTERN_FILES'], basename($_POST['file']))) {
 			die(json_error('Invalid file pattern'));
 		}
 	}
@@ -663,6 +702,10 @@ $_SESSION['pheditor_token'] = bin2hex(random_bytes(32));
 		<?php endif; ?>
 	<?php endforeach; ?>
 
+  <link rel="stylesheet" href="https://codemirror.net/addon/hint/show-hint.css">
+
+  
+  
 	<style type="text/css">
 		h1,
 		h1 a,
@@ -962,13 +1005,20 @@ $_SESSION['pheditor_token'] = bin2hex(random_bytes(32));
 					theme: "<?= EDITOR_THEME ?>",
 				<?php endif; ?>
 				lineNumbers: true,
-				mode: "application/x-httpd-php",
+				mode: {name: "javascript", globalVars: true},
 				indentUnit: 4,
 				indentWithTabs: true,
 				lineWrapping: true,
 				gutters: ["CodeMirror-lint-markers"],
-				lint: true
+				lint: true,
+				extraKeys: {"Ctrl-Space": "autocomplete"}
 			});
+			editor.on('keyup',function(){
+			    console.log('xcxcv')
+			});
+
+
+			
 
 			$("#files > div").on("load_node.jstree", function(a, b) {
 				if (b.node.a_attr && b.node.a_attr.href != undefined) {
@@ -1808,5 +1858,4 @@ $_SESSION['pheditor_token'] = bin2hex(random_bytes(32));
 	</div>
 
 </body>
-
 </html>

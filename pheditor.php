@@ -35,7 +35,7 @@ define('LOCAL_ASSETS', false); // if true you should run `npm i` to download req
 try { 
   
   define('USERS',json_decode(file_get_contents(PATH_TO_DEVS_JSON),true));
-  define('MAIN_DIR','/home/fladzyzo/public_html/public'/*USERS['MAIN_DIR']*/);
+  define('MAIN_DIR','SERS['MAIN_DIR']);
   
 }  
 catch (\Exception $exception) {  
